@@ -145,16 +145,32 @@ db_path: "runtime_state.db"
     print(f"[+] Initialized declarative configuration: {out_file.resolve()}")
 
 
+def find_available_port(host: str, target_port: int, max_attempts: int = 10) -> int:
+    import socket
+    for p in range(target_port, target_port + max_attempts):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind((host, p))
+                return p
+            except OSError:
+                continue
+    return target_port
+
+
 def cmd_run(args):
     print_banner()
     cfg = load_config(args.config)
-    port = args.port or cfg.server.port
+    requested_port = args.port or cfg.server.port
     host = args.host or cfg.server.host
+
+    port = find_available_port(host, requested_port)
+    if port != requested_port:
+        print(f" [!] Port {requested_port} is busy. Automatically rebound to available port: {port}")
 
     # 1. Engage Win32 Persistence
     power_mgr = PowerManager(allow_display_sleep=True)
     res = power_mgr.enable_perpetual_mode()
-    print(f" [+] Win32 Persistence Engaged : {res.get('flags_set', 'ACTIVE')} (Away Mode Enabled)")
+    print(f" [+] Host Persistence Engaged  : {res.get('flags_set', 'ACTIVE')} (Away Mode Enabled)")
 
     # 2. Check Antigravity Tools :8045
     bridge = AntigravityToolsBridge(gateway_url=cfg.antigravity_tools.gateway_url)
@@ -176,7 +192,12 @@ def cmd_run(args):
     print("=" * 72)
 
     app = create_app(cfg)
-    uvicorn.run(app, host=host, port=port, log_level="warning")
+    try:
+        uvicorn.run(app, host=host, port=port, log_level="warning")
+    finally:
+        print("\n [*] Restoring normal host power management...")
+        power_mgr.restore_normal_mode()
+        print(" [+] Host power mode restored.")
 
 
 def main():

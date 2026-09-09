@@ -57,6 +57,9 @@
             </p>
         </div>
         <div class="flex items-center gap-3">
+            <button onclick="copyDiagnostics()" class="px-3 py-1.5 text-xs font-mono bg-waibi-card hover:bg-zinc-800 border border-waibi-border text-zinc-300 rounded-lg flex items-center gap-1.5 transition" title="Copy live system telemetry to clipboard">
+                📋 Copy Diagnostics
+            </button>
             <span id="gateway-status" class="px-3.5 py-1.5 text-xs font-mono bg-waibi-card border border-waibi-border text-emerald-400 rounded-lg flex items-center gap-1.5">
                 ● Bridge :8045 Online
             </span>
@@ -246,6 +249,17 @@
     </footer>
 
     <script>
+        async function copyDiagnostics() {
+            try {
+                const res = await fetch('/api/telemetry');
+                const data = await res.json();
+                await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+                alert('Diagnostic telemetry copied to clipboard!');
+            } catch (e) {
+                alert('Failed to copy telemetry: ' + e);
+            }
+        }
+
         async function refreshTelemetry() {
             try {
                 const res = await fetch('/api/telemetry');
