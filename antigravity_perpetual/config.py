@@ -43,17 +43,29 @@ class AntigravityToolsConfig:
 class HostPersistenceConfig:
     execution_state: str = "0x80000041"  # ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_AWAYMODE_REQUIRED
     silence_deadlock_timeout_sec: int = 180
-    max_thermal_celsius: float = 80.0
-    min_battery_percent: float = 15.0
+    max_thermal_celsius: float = 65.0
+    min_battery_percent: float = 20.0
 
 
 @dataclass
 class NPUFallbackConfig:
     enabled: bool = True
-    npu_server_url: str = "http://127.0.0.1:8765"
+    npu_server_url: str = "http://127.0.0.1:8899"
     device: str = "NPU"
     target_embedding_latency_ms: float = 3.0
     target_vision_fps: float = 857.0
+
+
+@dataclass
+class NotificationConfig:
+    enabled: bool = True
+    windows_toast_enabled: bool = True
+    discord_webhook_url: Optional[str] = None
+    telegram_bot_token: Optional[str] = None
+    telegram_chat_id: Optional[str] = None
+    thermal_alert_celsius: float = 65.0
+    battery_alert_percent: float = 20.0
+    cooldown_sec: float = 120.0
 
 
 @dataclass
@@ -63,19 +75,24 @@ class ServerConfig:
     hud_enabled: bool = True
 
 
+DEFAULT_DB_PATH = str(Path.home() / ".antigravity_perpetual" / "state.db")
+
+
 @dataclass
 class PerpetualConfig:
     accounts: List[AccountConfig] = field(default_factory=lambda: [
         AccountConfig(id="account_pro_1", name="Google Pro - Alpha", priority=1),
         AccountConfig(id="account_pro_2", name="Google Pro - Beta", priority=2),
         AccountConfig(id="account_pro_3", name="Google Pro - Gamma", priority=3),
+        AccountConfig(id="account_pro_4", name="Google Pro - Delta", priority=4),
     ])
     circuit_breaker: CircuitBreakerConfig = field(default_factory=CircuitBreakerConfig)
     antigravity_tools: AntigravityToolsConfig = field(default_factory=AntigravityToolsConfig)
     host: HostPersistenceConfig = field(default_factory=HostPersistenceConfig)
     npu: NPUFallbackConfig = field(default_factory=NPUFallbackConfig)
+    notifications: NotificationConfig = field(default_factory=NotificationConfig)
     server: ServerConfig = field(default_factory=ServerConfig)
-    db_path: str = "runtime_state.db"
+    db_path: str = DEFAULT_DB_PATH
 
 
 def load_config(config_path: Optional[str | Path] = None) -> PerpetualConfig:
@@ -114,6 +131,7 @@ def load_config(config_path: Optional[str | Path] = None) -> PerpetualConfig:
                 AccountConfig(id="account_pro_1", name="Google Pro - Alpha", priority=1),
                 AccountConfig(id="account_pro_2", name="Google Pro - Beta", priority=2),
                 AccountConfig(id="account_pro_3", name="Google Pro - Gamma", priority=3),
+                AccountConfig(id="account_pro_4", name="Google Pro - Delta", priority=4),
             ]
 
         cb_data = raw.get("quota_pool", {}).get("circuit_breaker", {})
@@ -135,14 +153,26 @@ def load_config(config_path: Optional[str | Path] = None) -> PerpetualConfig:
         host_cfg = HostPersistenceConfig(
             execution_state=host_data.get("execution_state", "0x80000041"),
             silence_deadlock_timeout_sec=host_data.get("silence_deadlock_timeout_sec", 180),
-            max_thermal_celsius=host_data.get("max_thermal_celsius", 80.0),
-            min_battery_percent=host_data.get("min_battery_percent", 15.0)
+            max_thermal_celsius=host_data.get("max_thermal_celsius", 65.0),
+            min_battery_percent=host_data.get("min_battery_percent", 20.0)
         )
 
         npu_data = raw.get("npu_fallback", {})
         npu_cfg = NPUFallbackConfig(
             enabled=npu_data.get("enabled", True),
-            npu_server_url=npu_data.get("npu_server_url", "http://127.0.0.1:8765")
+            npu_server_url=npu_data.get("npu_server_url", "http://127.0.0.1:8899")
+        )
+
+        notif_data = raw.get("notifications", {})
+        notif_cfg = NotificationConfig(
+            enabled=notif_data.get("enabled", True),
+            windows_toast_enabled=notif_data.get("windows_toast_enabled", True),
+            discord_webhook_url=notif_data.get("discord_webhook_url"),
+            telegram_bot_token=notif_data.get("telegram_bot_token"),
+            telegram_chat_id=notif_data.get("telegram_chat_id"),
+            thermal_alert_celsius=notif_data.get("thermal_alert_celsius", 65.0),
+            battery_alert_percent=notif_data.get("battery_alert_percent", 20.0),
+            cooldown_sec=notif_data.get("cooldown_sec", 120.0)
         )
 
         srv_data = raw.get("server", {})
@@ -152,14 +182,21 @@ def load_config(config_path: Optional[str | Path] = None) -> PerpetualConfig:
             hud_enabled=srv_data.get("hud_enabled", True)
         )
 
+        raw_db_path = raw.get("db_path", DEFAULT_DB_PATH)
+        if raw_db_path.startswith("~"):
+            resolved_db = str(Path.home() / raw_db_path[2:].lstrip("\\/"))
+        else:
+            resolved_db = raw_db_path
+
         return PerpetualConfig(
             accounts=accounts,
             circuit_breaker=cb,
             antigravity_tools=ag_tools,
             host=host_cfg,
             npu=npu_cfg,
+            notifications=notif_cfg,
             server=srv_cfg,
-            db_path=raw.get("db_path", "runtime_state.db")
+            db_path=resolved_db
         )
 
     return PerpetualConfig()

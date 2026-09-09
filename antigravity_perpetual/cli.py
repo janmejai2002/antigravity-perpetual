@@ -27,7 +27,7 @@ from antigravity_perpetual.server.app import create_app
 def print_banner():
     print("=" * 72)
     print("  [+] ANTIGRAVITY PERPETUAL SUPERVISOR  v" + __version__)
-    print("  Autonomous Multi-Day Agent Supervisor & 3-Account Quota Reservoir")
+    print("  Autonomous Multi-Day Agent Supervisor & 4-Account Quota Reservoir")
     print("=" * 72)
 
 
@@ -51,9 +51,11 @@ def cmd_status(args):
     batt_str = f"{hw.battery_percent}% ({'Plugged In' if hw.power_plugged else 'Battery'})" if hw.battery_percent is not None else "N/A"
     print(f" [Battery Status]       : {batt_str}")
     print(f" [Antigravity Tools]    : {'ONLINE (' + bridge_ver + ')' if bridge_ok else 'OFFLINE'} @ {cfg.antigravity_tools.gateway_url}")
-    print(f" [Lunar Lake NPU]       : {'ONLINE (Port 8765)' if npu_ok else 'OFFLINE'} @ {cfg.npu.npu_server_url}")
+    print(f" [Lunar Lake NPU]       : {'ONLINE (47 TOPS INT8)' if npu_ok else 'OFFLINE'} @ {cfg.npu.npu_server_url}")
+    print(f" [State Database]       : {cfg.db_path}")
     print(f" [Watchdog Silence]     : Max {cfg.host.silence_deadlock_timeout_sec}s timeout")
     print("=" * 72)
+
 
 
 def cmd_accounts(args):
@@ -191,7 +193,7 @@ def cmd_run(args):
     print(f" [+] Press Ctrl+C to terminate perpetual supervisor.")
     print("=" * 72)
 
-    app = create_app(cfg)
+    app = create_app(cfg, power_manager=power_mgr)
     try:
         uvicorn.run(app, host=host, port=port, log_level="warning")
     finally:
@@ -200,10 +202,61 @@ def cmd_run(args):
         print(" [+] Host power mode restored.")
 
 
+def cmd_service(args):
+    import subprocess
+    scripts_dir = Path(__file__).parent.parent / "scripts"
+    task_name = "AntigravityPerpetualSupervisor"
+
+    if args.service_action == "install":
+        print(f"[*] Installing Windows Scheduled Task: {task_name}...")
+        ps_script = scripts_dir / "register_autostart.ps1"
+        cmd = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(ps_script)]
+        if getattr(args, "start", False):
+            cmd.append("-StartNow")
+        res = subprocess.run(cmd, text=True, capture_output=True)
+        print(res.stdout)
+        if res.stderr:
+            print(res.stderr)
+
+    elif args.service_action == "uninstall":
+        print(f"[*] Uninstalling Windows Scheduled Task: {task_name}...")
+        ps_script = scripts_dir / "unregister_autostart.ps1"
+        res = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(ps_script)], text=True, capture_output=True)
+        print(res.stdout)
+        if res.stderr:
+            print(res.stderr)
+
+    elif args.service_action == "status":
+        print_banner()
+        print(f" [Scheduled Task]       : {task_name}")
+        ps_cmd = f"Get-ScheduledTask -TaskName '{task_name}' -ErrorAction SilentlyContinue | Select-Object TaskName, State | ConvertTo-Json"
+        res = subprocess.run(["powershell", "-NoProfile", "-Command", ps_cmd], text=True, capture_output=True)
+        if res.returncode == 0 and res.stdout.strip():
+            try:
+                data = json.loads(res.stdout)
+                state_str = {0: "Unknown", 1: "Disabled", 2: "Queued", 3: "Ready", 4: "Running"}.get(data.get("State"), str(data.get("State")))
+                print(f" [Registration State]   : REGISTERED (State: {state_str})")
+            except Exception:
+                print(f" [Registration State]   : REGISTERED")
+        else:
+            print(f" [Registration State]   : NOT_REGISTERED")
+
+        # Check if daemon is listening
+        import socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.connect(("127.0.0.1", 8765))
+            s.close()
+            print(f" [Live Daemon :8765]   : LISTENING (ONLINE)")
+        except Exception:
+            print(f" [Live Daemon :8765]   : NOT_LISTENING")
+        print("=" * 72)
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="perpetual",
-        description="Autonomous Multi-Day Agent Supervisor & 3-Account Quota Reservoir"
+        description="Autonomous Multi-Day Agent Supervisor & 4-Account Quota Reservoir"
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("-c", "--config", type=str, default=None, help="Path to perpetual_config.yaml")
@@ -225,6 +278,11 @@ def main():
     p_init = subparsers.add_parser("init", help="Initialize a default perpetual_config.yaml")
     p_init.add_argument("-f", "--force", action="store_true", help="Overwrite existing config")
 
+    # service
+    p_service = subparsers.add_parser("service", help="Manage Windows Scheduled Task auto-start")
+    p_service.add_argument("service_action", choices=["install", "uninstall", "status"], help="Action to perform")
+    p_service.add_argument("--start", action="store_true", help="Start the task immediately upon installation")
+
     args = parser.parse_args()
     if not args.command:
         parser.print_help()
@@ -238,6 +296,9 @@ def main():
         cmd_accounts(args)
     elif args.command == "init":
         cmd_init(args)
+    elif args.command == "service":
+        cmd_service(args)
+
 
 
 if __name__ == "__main__":

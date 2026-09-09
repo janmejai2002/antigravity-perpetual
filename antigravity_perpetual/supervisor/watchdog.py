@@ -10,6 +10,7 @@ from typing import Optional, Callable, Dict, Any
 
 from antigravity_perpetual.supervisor.power import PowerManager
 from antigravity_perpetual.supervisor.thermal import ThermalMonitor
+from antigravity_perpetual.supervisor.notifier import AlertNotifier, AlertCategory
 
 
 class SupervisorWatchdog:
@@ -18,12 +19,15 @@ class SupervisorWatchdog:
         silence_timeout_sec: int = 180,
         thermal_monitor: Optional[ThermalMonitor] = None,
         power_manager: Optional[PowerManager] = None,
-        on_deadlock_callback: Optional[Callable[[], None]] = None
+        on_deadlock_callback: Optional[Callable[[], None]] = None,
+        notifier: Optional[AlertNotifier] = None
     ):
         self.silence_timeout_sec = silence_timeout_sec
         self.thermal_monitor = thermal_monitor or ThermalMonitor()
         self.power_manager = power_manager or PowerManager()
         self.on_deadlock_callback = on_deadlock_callback
+        self.notifier = notifier
+
 
         self.last_heartbeat = time.time()
         self.is_running = False
@@ -71,6 +75,17 @@ class SupervisorWatchdog:
         while self.is_running:
             health = self.check_health()
             if health["is_deadlocked"]:
+                if self.notifier:
+                    try:
+                        self.notifier.notify(
+                            category=AlertCategory.DEADLOCK_SILENCE,
+                            severity="CRITICAL",
+                            title="Agent Deadlock Detected",
+                            message=f"Silence watchdog detected lack of agent heartbeat for {health['silence_duration_sec']}s (Timeout: {self.silence_timeout_sec}s). Triggering self-healing recovery.",
+                            details={"silence_sec": health["silence_duration_sec"]}
+                        )
+                    except Exception:
+                        pass
                 if self.on_deadlock_callback:
                     try:
                         self.on_deadlock_callback()
@@ -80,3 +95,4 @@ class SupervisorWatchdog:
                 self.last_heartbeat = time.time()
 
             time.sleep(5.0)
+

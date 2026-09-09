@@ -18,13 +18,16 @@ class CircuitBreaker:
         failure_threshold: int = 3,
         recovery_timeout_sec: float = 60.0,
         backoff_factor: float = 2.0,
-        jitter_range: float = 0.2
+        jitter_range: float = 0.2,
+        notifier: Optional[Any] = None
     ):
         self.ledger = ledger
         self.failure_threshold = failure_threshold
         self.recovery_timeout_sec = recovery_timeout_sec
         self.backoff_factor = backoff_factor
         self.jitter_range = jitter_range
+        self.notifier = notifier
+
 
     def calculate_backoff(self, consecutive_failures: int) -> float:
         """Full Jitter Exponential Backoff formula: T = min(T_max, T_0 * 2^failures) +/- rand."""
@@ -90,7 +93,25 @@ class CircuitBreaker:
                 last_failure_ts=now,
                 next_probe_ts=next_probe
             )
+            if self.notifier:
+                try:
+                    from antigravity_perpetual.supervisor.notifier import AlertCategory
+                    self.notifier.notify(
+                        category=AlertCategory.QUOTA_EXHAUSTED_429,
+                        severity="CRITICAL" if is_429 else "WARNING",
+                        title="Quota Circuit Breaker Tripped",
+                        message=f"Account '{account_id}' tripped to OPEN state (HTTP {status_code}). Backing off for {round(backoff, 1)}s.",
+                        details={
+                            "account_id": account_id,
+                            "status_code": status_code,
+                            "backoff_sec": round(backoff, 1),
+                            "consecutive_failures": failures
+                        }
+                    )
+                except Exception:
+                    pass
         else:
+
             self.ledger.update_circuit_state(
                 account_id,
                 CircuitState.CLOSED,

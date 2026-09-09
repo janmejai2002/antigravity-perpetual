@@ -19,6 +19,12 @@ quota_pool:
       tpm_limit: 4000000
       rpd_limit: 30000
       priority: 3
+    - id: "account_pro_4"
+      name: "Google Pro - Delta"
+      rpm_limit: 360
+      tpm_limit: 4000000
+      rpd_limit: 30000
+      priority: 4
   circuit_breaker:
     failure_threshold: 3
     recovery_timeout_sec: 60.0
@@ -33,17 +39,25 @@ antigravity_tools:
 host_persistence:
   execution_state: "0x80000041"
   silence_deadlock_timeout_sec: 180
-  max_thermal_celsius: 80.0
-  min_battery_percent: 15.0
+  max_thermal_celsius: 65.0
+  min_battery_percent: 20.0
 
 npu_fallback:
   enabled: true
-  npu_server_url: "http://127.0.0.1:8765"
+  npu_server_url: "http://127.0.0.1:8899"
   device: "NPU"
+
+notifications:
+  enabled: true
+  windows_toast_enabled: true
+  thermal_alert_celsius: 65.0
+  battery_alert_percent: 20.0
+  cooldown_sec: 120.0
 
 server:
   host: "127.0.0.1"
   port: 8765
   hud_enabled: true
 
-db_path: "runtime_state.db"
+db_path: "~/.antigravity_perpetual/state.db"
+

@@ -4,11 +4,15 @@ ACID Task DAG State Machine & SQLite WAL Checkpoint Journal.
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import time
 from dataclasses import dataclass, asdict
 from enum import Enum
+from pathlib import Path
 from typing import List, Optional, Dict, Any
+
+DEFAULT_STATE_DB = str(Path.home() / ".antigravity_perpetual" / "state.db")
 
 
 class TaskStatus(str, Enum):
@@ -40,9 +44,12 @@ class TaskNode:
 
 
 class CheckpointManager:
-    def __init__(self, db_path: str = "runtime_state.db"):
-        self.db_path = db_path
+    def __init__(self, db_path: str = DEFAULT_STATE_DB):
+        expanded = os.path.abspath(os.path.expanduser(db_path))
+        Path(expanded).parent.mkdir(parents=True, exist_ok=True)
+        self.db_path = expanded
         self._init_db()
+
 
     def _get_conn(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path, timeout=10.0)

@@ -3,9 +3,12 @@ SQLite WAL Quota Ledger with Sliding Window and Pacific Midnight Reset tracking.
 """
 from __future__ import annotations
 
+import json
+import os
 import sqlite3
 import time
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 from typing import List, Optional, Tuple, Dict, Any
 
 from antigravity_perpetual.quota.models import AccountQuota, RequestRecord, CircuitState
@@ -15,7 +18,9 @@ PACIFIC_OFFSET = timedelta(hours=-7)  # PDT / UTC-7
 
 class QuotaLedger:
     def __init__(self, db_path: str = "quota_ledger.db"):
-        self.db_path = db_path
+        expanded = os.path.abspath(os.path.expanduser(db_path))
+        Path(expanded).parent.mkdir(parents=True, exist_ok=True)
+        self.db_path = expanded
         self._init_db()
 
     def _get_connection(self) -> sqlite3.Connection:
@@ -53,8 +58,52 @@ class QuotaLedger:
                     FOREIGN KEY(account_id) REFERENCES accounts(id)
                 );
 
+                CREATE TABLE IF NOT EXISTS system_alerts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp REAL NOT NULL,
+                    category TEXT NOT NULL,
+                    severity TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    details_json TEXT
+                );
+
                 CREATE INDEX IF NOT EXISTS idx_requests_acc_ts ON request_ledger(account_id, timestamp);
+                CREATE INDEX IF NOT EXISTS idx_alerts_ts ON system_alerts(timestamp);
             """)
+            self._migrate_legacy_db_if_needed(conn)
+
+    def _migrate_legacy_db_if_needed(self, conn: sqlite3.Connection):
+        """Migrate existing account records from legacy runtime_state.db if brand new default db."""
+        try:
+            from antigravity_perpetual.config import DEFAULT_DB_PATH
+            if os.path.abspath(self.db_path) != os.path.abspath(DEFAULT_DB_PATH):
+                return
+            row = conn.execute("SELECT COUNT(*) as cnt FROM accounts;").fetchone()
+            if row and row["cnt"] == 0:
+                legacy_path = Path("runtime_state.db")
+                if legacy_path.exists() and str(legacy_path.resolve()) != str(Path(self.db_path).resolve()):
+                    legacy_conn = sqlite3.connect(legacy_path)
+                    legacy_conn.row_factory = sqlite3.Row
+                    try:
+                        accounts = legacy_conn.execute("SELECT * FROM accounts;").fetchall()
+                        for a in accounts:
+                            conn.execute("""
+                                INSERT OR IGNORE INTO accounts (
+                                    id, name, rpm_limit, tpm_limit, rpd_limit, priority,
+                                    circuit_state, consecutive_failures, last_failure_timestamp,
+                                    next_probe_timestamp, last_pacific_reset
+                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """, (
+                                a["id"], a["name"], a["rpm_limit"], a["tpm_limit"], a["rpd_limit"],
+                                a["priority"], a["circuit_state"], a["consecutive_failures"],
+                                a["last_failure_timestamp"], a["next_probe_timestamp"], a["last_pacific_reset"]
+                            ))
+                        conn.commit()
+                    finally:
+                        legacy_conn.close()
+        except Exception:
+            pass
+
 
     @staticmethod
     def get_current_pacific_day() -> str:
@@ -173,3 +222,47 @@ class QuotaLedger:
                     last_pacific_reset=r["last_pacific_reset"]
                 ))
             return results
+
+    def record_alert(
+        self,
+        category: str,
+        severity: str,
+        message: str,
+        details: Optional[Dict[str, Any]] = None,
+        now: Optional[float] = None
+    ) -> int:
+        ts = now if now is not None else time.time()
+        details_str = json.dumps(details) if details else None
+        with self._get_connection() as conn:
+            cursor = conn.execute("""
+                INSERT INTO system_alerts (timestamp, category, severity, message, details_json)
+                VALUES (?, ?, ?, ?, ?);
+            """, (ts, category, severity, message, details_str))
+            return cursor.lastrowid
+
+    def get_recent_alerts(self, limit: int = 50) -> List[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            rows = conn.execute("""
+                SELECT id, timestamp, category, severity, message, details_json
+                FROM system_alerts
+                ORDER BY timestamp DESC
+                LIMIT ?;
+            """, (limit,)).fetchall()
+            alerts = []
+            for r in rows:
+                details = None
+                if r["details_json"]:
+                    try:
+                        details = json.loads(r["details_json"])
+                    except Exception:
+                        details = r["details_json"]
+                alerts.append({
+                    "id": r["id"],
+                    "timestamp": r["timestamp"],
+                    "category": r["category"],
+                    "severity": r["severity"],
+                    "message": r["message"],
+                    "details": details
+                })
+            return alerts
+

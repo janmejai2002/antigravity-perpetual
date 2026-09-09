@@ -23,12 +23,32 @@ from antigravity_perpetual.supervisor.power import PowerManager
 from antigravity_perpetual.hardware.npu_fallback import NPUFallback
 
 
+from antigravity_perpetual.supervisor.notifier import AlertNotifier, AlertCategory
+
+
 class HeartbeatRequest(BaseModel):
     caller: Optional[str] = "agent"
     task_id: Optional[str] = None
 
 
-def create_app(config: Optional[PerpetualConfig] = None) -> FastAPI:
+class NPUEmbedRequest(BaseModel):
+    text: str
+
+
+class NPUAuditRequest(BaseModel):
+    command: str
+
+
+class TestNotificationRequest(BaseModel):
+    title: Optional[str] = "Test Sentinel Alert"
+    message: Optional[str] = "Autonomous perpetual sentinel alert pipeline verified."
+    severity: Optional[str] = "INFO"
+
+
+def create_app(
+    config: Optional[PerpetualConfig] = None,
+    power_manager: Optional[PowerManager] = None
+) -> FastAPI:
     if config is None:
         config = load_config()
 
@@ -45,12 +65,15 @@ def create_app(config: Optional[PerpetualConfig] = None) -> FastAPI:
             priority=acc.priority
         ))
 
+    notifier = AlertNotifier(config=config.notifications, ledger=ledger)
+
     cb = CircuitBreaker(
         ledger=ledger,
         failure_threshold=config.circuit_breaker.failure_threshold,
         recovery_timeout_sec=config.circuit_breaker.recovery_timeout_sec,
         backoff_factor=config.circuit_breaker.backoff_factor,
-        jitter_range=config.circuit_breaker.jitter_range
+        jitter_range=config.circuit_breaker.jitter_range,
+        notifier=notifier
     )
     rotator = QuotaRotator(ledger=ledger, circuit_breaker=cb)
     bridge = AntigravityToolsBridge(
@@ -58,21 +81,26 @@ def create_app(config: Optional[PerpetualConfig] = None) -> FastAPI:
         gateway_url=config.antigravity_tools.gateway_url,
         timeout_sec=config.antigravity_tools.timeout_sec
     )
-    power_mgr = PowerManager()
+    power_mgr = power_manager or PowerManager()
+    if not power_mgr.is_active:
+        power_mgr.enable_perpetual_mode()
+
     thermal_mon = ThermalMonitor(
         max_thermal_celsius=config.host.max_thermal_celsius,
-        min_battery_percent=config.host.min_battery_percent
+        min_battery_percent=config.host.min_battery_percent,
+        notifier=notifier
     )
     watchdog = SupervisorWatchdog(
         silence_timeout_sec=config.host.silence_deadlock_timeout_sec,
         thermal_monitor=thermal_mon,
-        power_manager=power_mgr
+        power_manager=power_mgr,
+        notifier=notifier
     )
     npu_fallback = NPUFallback(npu_server_url=config.npu.npu_server_url)
 
     app = FastAPI(
         title="Antigravity Perpetual Supervisor",
-        description="Autonomous Multi-Day Agent Supervisor & 3-Account Quota Pool",
+        description="Autonomous Multi-Day Agent Supervisor & 4-Account Quota Pool",
         version="1.0.0"
     )
 
@@ -83,6 +111,14 @@ def create_app(config: Optional[PerpetualConfig] = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"]
     )
+
+    @app.on_event("startup")
+    async def on_startup():
+        watchdog.start()
+
+    @app.on_event("shutdown")
+    async def on_shutdown():
+        watchdog.stop()
 
     # Cache UI path
     ui_path = Path(__file__).parent.parent / "ui" / "index.html"
@@ -168,10 +204,62 @@ def create_app(config: Optional[PerpetualConfig] = None) -> FastAPI:
             for a in accounts
         ])
 
+    @app.get("/api/alerts")
+    async def get_alerts(limit: int = 50):
+        alerts = ledger.get_recent_alerts(limit=limit)
+        return JSONResponse(content=alerts)
+
+    @app.post("/api/notify/test")
+    async def post_test_alert(req: TestNotificationRequest):
+        sent = notifier.notify(
+            category=AlertCategory.SYSTEM_EVENT,
+            severity=req.severity or "INFO",
+            title=req.title or "Test Sentinel Alert",
+            message=req.message or "Autonomous perpetual sentinel alert verified.",
+            force=True
+        )
+        return JSONResponse(content={"status": "dispatched" if sent else "suppressed"})
+
+    @app.get("/api/npu/status")
+    async def get_npu_status():
+        status = npu_fallback.get_device_status()
+        return JSONResponse(content=status)
+
+    @app.post("/api/npu/embed")
+    async def post_npu_embed(req: NPUEmbedRequest):
+        res = npu_fallback.embed_text(req.text)
+        return JSONResponse(content=res)
+
+    @app.get("/api/npu/search")
+    async def get_npu_search(q: str, top_k: int = 3):
+        res = npu_fallback.semantic_search(q, top_k=top_k)
+        return JSONResponse(content=res)
+
+    @app.get("/api/npu/audit")
+    @app.post("/api/npu/audit")
+    async def audit_npu_command(cmd: Optional[str] = None, req: Optional[NPUAuditRequest] = None):
+        target_cmd = cmd or (req.command if req else "")
+        res = npu_fallback.audit_command(target_cmd)
+        return JSONResponse(content=res)
+
     @app.post("/api/heartbeat")
     async def post_heartbeat(req: HeartbeatRequest):
         watchdog.heartbeat()
         return JSONResponse(content={"status": "heartbeat_acknowledged", "timestamp": time.time()})
+
+    @app.post("/api/circuit_breaker/trip")
+    async def post_trip_circuit(account_id: Optional[str] = None):
+        accs = ledger.get_account_quotas()
+        target = account_id or (accs[0].account_id if accs else "account_pro_1")
+        cb.record_failure(target, status_code=429)
+        return JSONResponse(content={"status": "tripped", "account_id": target})
+
+    @app.post("/api/circuit_breaker/reset")
+    async def post_reset_circuits():
+        accs = ledger.get_account_quotas()
+        for a in accs:
+            cb.record_success(a.account_id)
+        return JSONResponse(content={"status": "all_circuits_reset_closed", "count": len(accs)})
 
     @app.post("/api/forward")
     async def forward_request(req: Request):
@@ -181,3 +269,5 @@ def create_app(config: Optional[PerpetualConfig] = None) -> FastAPI:
         return JSONResponse(content=result, status_code=result.get("status_code", 200))
 
     return app
+
+

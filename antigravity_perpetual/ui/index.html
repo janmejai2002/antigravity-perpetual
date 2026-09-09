@@ -53,7 +53,7 @@
                 </h1>
             </div>
             <p class="text-sm text-waibi-muted mt-1 font-mono">
-                Sovereign Autonomous Agent Supervisor • 3-Account Quota Pool • Intel Lunar Lake NPU 4000
+                Sovereign Autonomous Agent Supervisor • 4-Account Quota Pool • Intel Lunar Lake NPU 4000
             </p>
         </div>
         <div class="flex items-center gap-3">
@@ -87,16 +87,43 @@
             </div>
         </div>
 
+        <!-- Interactive Agent Action Center -->
+        <div class="bg-waibi-card border border-waibi-border rounded-xl p-5 space-y-3">
+            <div class="flex items-center justify-between border-b border-waibi-border pb-3">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2 font-mono">
+                    <span class="text-waibi-water">🎮</span> AGENT INTERACTIVE CONTROL CENTER
+                </h3>
+                <span class="text-xs font-mono text-zinc-400">Tactile Hardware & API Controls</span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <button onclick="sendHeartbeat()" class="px-4 py-2.5 bg-waibi-bg hover:bg-zinc-800 border border-emerald-500/40 text-emerald-400 rounded-lg text-xs font-mono font-semibold flex items-center justify-center gap-2 transition hover:scale-[1.02] active:scale-[0.98]">
+                    <span>💓</span> Send Heartbeat (0s Reset)
+                </button>
+                <button onclick="probeGatewayBridge()" class="px-4 py-2.5 bg-waibi-bg hover:bg-zinc-800 border border-waibi-border text-cyan-400 rounded-lg text-xs font-mono font-semibold flex items-center justify-center gap-2 transition hover:scale-[1.02] active:scale-[0.98]">
+                    <span>🌉</span> Test Bridge (:8045)
+                </button>
+                <button onclick="probeNPUSilicon()" class="px-4 py-2.5 bg-waibi-bg hover:bg-zinc-800 border border-waibi-border text-purple-400 rounded-lg text-xs font-mono font-semibold flex items-center justify-center gap-2 transition hover:scale-[1.02] active:scale-[0.98]">
+                    <span>💎</span> Test NPU Embedding
+                </button>
+                <button onclick="toggleCircuitBreaker()" class="px-4 py-2.5 bg-waibi-bg hover:bg-zinc-800 border border-amber-500/40 text-amber-400 rounded-lg text-xs font-mono font-semibold flex items-center justify-center gap-2 transition hover:scale-[1.02] active:scale-[0.98]">
+                    <span>⚡</span> Reset All Circuits
+                </button>
+            </div>
+            <div id="action-feedback" class="text-xs font-mono text-zinc-400 bg-black/40 p-2.5 rounded border border-waibi-border/50 hidden"></div>
+        </div>
+
         <!-- 3-Column Grid: Accounts Quota, Silicon Health, Active Epoch -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <!-- Col 1: Multi-Account Google Pro Quota Reservoir -->
             <div class="bg-waibi-card border border-waibi-border rounded-xl p-5 space-y-4">
                 <div class="flex items-center justify-between border-b border-waibi-border pb-3">
                     <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                        <span class="text-waibi-ochre">⛽</span> 3-ACCOUNT QUOTA POOL
+
+                        <span class="text-waibi-ochre">⛽</span> 4-ACCOUNT QUOTA POOL
                     </h3>
-                    <span class="text-xs font-mono text-waibi-moss">Capacity: 1,080 RPM</span>
+                    <span class="text-xs font-mono text-waibi-moss">Capacity: 1,440 RPM</span>
                 </div>
+
 
                 <div id="accounts-container" class="space-y-3">
                     <!-- Dynamic Account Cards -->
@@ -249,18 +276,89 @@
     </footer>
 
     <script>
+        function showFeedback(msg, isSuccess = true) {
+            const el = document.getElementById('action-feedback');
+            el.classList.remove('hidden');
+            el.innerHTML = `<span class="${isSuccess ? 'text-emerald-400' : 'text-rose-400'}">[ACTION]</span> ${msg}`;
+            setTimeout(() => { el.classList.add('hidden'); }, 6000);
+        }
+
+        async function sendHeartbeat() {
+            try {
+                const res = await fetch('/api/heartbeat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({caller: 'hud_action_center'})
+                });
+                const data = await res.json();
+                showFeedback(`Heartbeat acknowledged at ${new Date(data.timestamp * 1000).toLocaleTimeString()}! Watchdog silence counter reset to 0s.`);
+                refreshTelemetry();
+            } catch (err) {
+                showFeedback('Failed to send heartbeat: ' + err, false);
+            }
+        }
+
+        async function probeGatewayBridge() {
+            showFeedback('Dispatching latency probe to Antigravity Tools :8045...');
+            const t0 = performance.now();
+            try {
+                const res = await fetch('/api/forward', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        model: "gemini-3-flash",
+                        messages: [{"role": "user", "content": "ping"}],
+                        max_tokens: 5
+                    })
+                });
+                const dur = Math.round(performance.now() - t0);
+                showFeedback(`Gateway :8045 responded in ${dur}ms (HTTP ${res.status}).`);
+            } catch (err) {
+                showFeedback(`Gateway probe error: ${err}`, false);
+            }
+        }
+
+        async function probeNPUSilicon() {
+            showFeedback('Dispatching test embedding to Intel Lunar Lake NPU (Port 8899)...');
+            const t0 = performance.now();
+            try {
+                const res = await fetch('/api/npu/embed', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({text: "Antigravity Perpetual Supervisor NPU Verification"})
+                });
+                const data = await res.json();
+                const dur = Math.round(performance.now() - t0);
+                showFeedback(`NPU INT8 embedding completed in ${data.latency_ms || dur}ms (Vector dim: ${data.dim || 768}, Device: Intel AI Boost).`);
+            } catch (err) {
+                showFeedback(`NPU probe error: ${err}`, false);
+            }
+        }
+
+        async function toggleCircuitBreaker() {
+            try {
+                const res = await fetch('/api/circuit_breaker/reset', {method: 'POST'});
+                const data = await res.json();
+                showFeedback(`Circuit Breakers reset: ${data.count} accounts restored to CLOSED (Healthy) state!`);
+                refreshTelemetry();
+            } catch (err) {
+                showFeedback(`Circuit breaker reset error: ${err}`, false);
+            }
+        }
+
         async function copyDiagnostics() {
             try {
                 const res = await fetch('/api/telemetry');
                 const data = await res.json();
                 await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
-                alert('Diagnostic telemetry copied to clipboard!');
+                showFeedback('Full system telemetry JSON copied to clipboard!');
             } catch (e) {
-                alert('Failed to copy telemetry: ' + e);
+                showFeedback('Failed to copy telemetry: ' + e, false);
             }
         }
 
         async function refreshTelemetry() {
+
             try {
                 const res = await fetch('/api/telemetry');
                 if (!res.ok) return;
@@ -276,11 +374,55 @@
                             (data.hardware.power_plugged ? " (AC Connected)" : " (Battery)");
                     }
                 }
+
+                // Render dynamic accounts
+                if (data.accounts && data.accounts.length > 0) {
+                    const container = document.getElementById('accounts-container');
+                    container.innerHTML = data.accounts.map(acc => {
+                        const pct = Math.min(100, Math.round((acc.current_rpm / (acc.rpm_limit || 360)) * 100));
+                        const isClosed = acc.circuit_state === 'CLOSED';
+                        const badgeClass = isClosed ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400';
+                        const barColor = isClosed ? 'bg-emerald-400' : 'bg-rose-400';
+                        return `
+                        <div class="p-3 rounded-lg bg-waibi-bg border border-waibi-border space-y-2">
+                            <div class="flex justify-between items-center text-xs font-mono">
+                                <span class="text-white font-semibold">${acc.name}</span>
+                                <span class="px-2 py-0.5 rounded ${badgeClass} text-[10px]">${acc.circuit_state}</span>
+                            </div>
+                            <div class="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                                <div class="${barColor} h-1.5 rounded-full" style="width: ${Math.max(4, pct)}%"></div>
+                            </div>
+                            <div class="flex justify-between text-[11px] text-waibi-muted font-mono">
+                                <span>RPM: ${acc.current_rpm} / ${acc.rpm_limit}</span>
+                                <span>TPM: ${(acc.current_tpm / 1000).toFixed(1)}k</span>
+                            </div>
+                        </div>`;
+                    }).join('');
+                }
+
+                // Render recent alerts into event log
+                try {
+                    const alertRes = await fetch('/api/alerts?limit=5');
+                    if (alertRes.ok) {
+                        const alerts = await alertRes.json();
+                        if (alerts && alerts.length > 0) {
+                            const logDiv = document.getElementById('events-log');
+                            const alertHtml = alerts.map(a => {
+                                const col = a.severity === 'CRITICAL' ? 'text-rose-400' : a.severity === 'WARNING' ? 'text-amber-400' : 'text-cyan-400';
+                                const d = new Date(a.timestamp * 1000).toLocaleTimeString();
+                                return `<div class="${col}">[${a.category}] ${a.message} <span class="text-[10px] text-zinc-500">(${d})</span></div>`;
+                            }).join('');
+                            logDiv.innerHTML = alertHtml + logDiv.innerHTML.substring(0, 1000);
+                        }
+                    }
+                } catch (err) {}
+
             } catch (e) {
                 // Keep UI stable
             }
         }
         setInterval(refreshTelemetry, 3000);
+        refreshTelemetry();
     </script>
 </body>
 </html>
