@@ -1,0 +1,49 @@
+# Antigravity Perpetual Configuration
+quota_pool:
+  accounts:
+    - id: "account_pro_1"
+      name: "Google Pro - Alpha"
+      rpm_limit: 360
+      tpm_limit: 4000000
+      rpd_limit: 30000
+      priority: 1
+    - id: "account_pro_2"
+      name: "Google Pro - Beta"
+      rpm_limit: 360
+      tpm_limit: 4000000
+      rpd_limit: 30000
+      priority: 2
+    - id: "account_pro_3"
+      name: "Google Pro - Gamma"
+      rpm_limit: 360
+      tpm_limit: 4000000
+      rpd_limit: 30000
+      priority: 3
+  circuit_breaker:
+    failure_threshold: 3
+    recovery_timeout_sec: 60.0
+    backoff_factor: 2.0
+    jitter_range: 0.2
+
+antigravity_tools:
+  enabled: true
+  gateway_url: "http://127.0.0.1:8045"
+  timeout_sec: 30.0
+
+host_persistence:
+  execution_state: "0x80000041"
+  silence_deadlock_timeout_sec: 180
+  max_thermal_celsius: 80.0
+  min_battery_percent: 15.0
+
+npu_fallback:
+  enabled: true
+  npu_server_url: "http://127.0.0.1:8765"
+  device: "NPU"
+
+server:
+  host: "127.0.0.1"
+  port: 8765
+  hud_enabled: true
+
+db_path: "runtime_state.db"

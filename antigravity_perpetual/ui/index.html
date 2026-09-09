@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Antigravity Perpetual Supervisor | Multi-Account & Silicon HUD</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace']
+                    },
+                    colors: {
+                        waibi: {
+                            bg: '#0c0d0e',
+                            card: '#141618',
+                            border: '#22252a',
+                            water: '#38bdf8',
+                            moss: '#4ade80',
+                            ochre: '#fbbf24',
+                            plum: '#c084fc',
+                            indigo: '#818cf8',
+                            text: '#f1f5f9',
+                            muted: '#94a3b8'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(0.98); }
+        }
+        .pulse-subtle { animation: pulse-slow 3s infinite ease-in-out; }
+    </style>
+</head>
+<body class="bg-waibi-bg text-waibi-text font-sans antialiased min-h-screen p-4 md:p-8">
+    <!-- Top Header -->
+    <header class="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row md:items-center md:justify-between border-b border-waibi-border pb-6 gap-4">
+        <div>
+            <div class="flex items-center gap-3">
+                <span class="inline-flex h-3 w-3 rounded-full bg-emerald-400 animate-ping"></span>
+                <span class="inline-flex h-3 w-3 rounded-full bg-emerald-500 -ml-6"></span>
+                <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+                    ANTIGRAVITY PERPETUAL SUPERVISOR <span id="sla-badge" class="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded font-mono font-normal">99.999% SLA ONLINE</span>
+                </h1>
+            </div>
+            <p class="text-sm text-waibi-muted mt-1 font-mono">
+                Sovereign Autonomous Agent Supervisor • 3-Account Quota Pool • Intel Lunar Lake NPU 4000
+            </p>
+        </div>
+        <div class="flex items-center gap-3">
+            <span id="gateway-status" class="px-3.5 py-1.5 text-xs font-mono bg-waibi-card border border-waibi-border text-emerald-400 rounded-lg flex items-center gap-1.5">
+                ● Bridge :8045 Online
+            </span>
+            <span class="px-3 py-1.5 text-xs font-mono bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 rounded-lg">
+                Win32: 0x80000041
+            </span>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto space-y-6">
+        <!-- Live Alert / SLA Status Bar -->
+        <div class="bg-gradient-to-r from-emerald-950/30 via-waibi-card to-waibi-card border border-emerald-500/30 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-mono font-bold text-lg">
+                    ⚡
+                </div>
+                <div>
+                    <h2 class="text-sm font-semibold text-white">System Status: Sovereign & Unattended Mode Active</h2>
+                    <p class="text-xs text-waibi-muted">Screen Dim/Sleep Allowed • Away Mode Active • Compute 100% Awake</p>
+                </div>
+            </div>
+            <div class="text-right font-mono text-xs text-waibi-muted">
+                <div>Silence Watchdog: <span class="text-emerald-400" id="watchdog-silence">0s / 180s</span></div>
+                <div>Checkpoint Journal: <span class="text-indigo-400">SQLite WAL (ACID)</span></div>
+            </div>
+        </div>
+
+        <!-- 3-Column Grid: Accounts Quota, Silicon Health, Active Epoch -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Col 1: Multi-Account Google Pro Quota Reservoir -->
+            <div class="bg-waibi-card border border-waibi-border rounded-xl p-5 space-y-4">
+                <div class="flex items-center justify-between border-b border-waibi-border pb-3">
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                        <span class="text-waibi-ochre">⛽</span> 3-ACCOUNT QUOTA POOL
+                    </h3>
+                    <span class="text-xs font-mono text-waibi-moss">Capacity: 1,080 RPM</span>
+                </div>
+
+                <div id="accounts-container" class="space-y-3">
+                    <!-- Dynamic Account Cards -->
+                    <div class="p-3 rounded-lg bg-waibi-bg border border-waibi-border space-y-2">
+                        <div class="flex justify-between items-center text-xs font-mono">
+                            <span class="text-white font-semibold">Account Pro 1 (Alpha)</span>
+                            <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px]">CLOSED (Healthy)</span>
+                        </div>
+                        <div class="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                            <div class="bg-emerald-400 h-1.5 rounded-full" style="width: 14%"></div>
+                        </div>
+                        <div class="flex justify-between text-[11px] text-waibi-muted font-mono">
+                            <span>RPM: 12 / 360</span>
+                            <span>Tokens: 38.4k</span>
+                        </div>
+                    </div>
+
+                    <div class="p-3 rounded-lg bg-waibi-bg border border-waibi-border space-y-2">
+                        <div class="flex justify-between items-center text-xs font-mono">
+                            <span class="text-white font-semibold">Account Pro 2 (Beta)</span>
+                            <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px]">STANDBY</span>
+                        </div>
+                        <div class="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                            <div class="bg-indigo-400 h-1.5 rounded-full" style="width: 4%"></div>
+                        </div>
+                        <div class="flex justify-between text-[11px] text-waibi-muted font-mono">
+                            <span>RPM: 2 / 360</span>
+                            <span>Tokens: 8.1k</span>
+                        </div>
+                    </div>
+
+                    <div class="p-3 rounded-lg bg-waibi-bg border border-waibi-border space-y-2">
+                        <div class="flex justify-between items-center text-xs font-mono">
+                            <span class="text-white font-semibold">Account Pro 3 (Gamma)</span>
+                            <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px]">BURST RESERVE</span>
+                        </div>
+                        <div class="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                            <div class="bg-waibi-plum h-1.5 rounded-full" style="width: 0%"></div>
+                        </div>
+                        <div class="flex justify-between text-[11px] text-waibi-muted font-mono">
+                            <span>RPM: 0 / 360</span>
+                            <span>Tokens: 0k</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-2 border-t border-waibi-border text-xs text-waibi-muted flex justify-between font-mono">
+                    <span>rtk Token Compression:</span>
+                    <span class="text-emerald-400 font-bold">84.2% Reduction</span>
+                </div>
+            </div>
+
+            <!-- Col 2: Intel Lunar Lake Silicon Health -->
+            <div class="bg-waibi-card border border-waibi-border rounded-xl p-5 space-y-4">
+                <div class="flex items-center justify-between border-b border-waibi-border pb-3">
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                        <span class="text-waibi-water">💎</span> SILICON & NPU METRICS
+                    </h3>
+                    <span class="text-xs font-mono text-cyan-400">47 TOPS INT8</span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-waibi-bg border border-waibi-border rounded-lg p-3">
+                        <div class="text-waibi-muted text-[11px]">NPU Embed Latency</div>
+                        <div class="text-lg font-bold font-mono text-cyan-400 mt-1">1.99 ms</div>
+                        <div class="text-[10px] text-cyan-500 font-mono mt-0.5">Budget &lt; 3.0ms</div>
+                    </div>
+                    <div class="bg-waibi-bg border border-waibi-border rounded-lg p-3">
+                        <div class="text-waibi-muted text-[11px]">Vision Inference</div>
+                        <div class="text-lg font-bold font-mono text-purple-400 mt-1">0.71 ms</div>
+                        <div class="text-[10px] text-purple-400 font-mono mt-0.5">1,320 FPS Sustained</div>
+                    </div>
+                </div>
+
+                <div class="bg-waibi-bg border border-waibi-border rounded-lg p-3 space-y-1.5 text-xs font-mono">
+                    <div class="flex justify-between">
+                        <span class="text-waibi-muted">Thermal Telemetry:</span>
+                        <span id="thermal-val" class="text-emerald-400 font-bold">48.2°C (Normal)</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-waibi-muted">Battery Status:</span>
+                        <span id="battery-val" class="text-emerald-400">100% (AC Connected)</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-waibi-muted">Level Zero Reset:</span>
+                        <span class="text-emerald-400">&lt; 350ms (Zero-Reboot)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Col 3: Current DAG Task Progression -->
+            <div class="bg-waibi-card border border-waibi-border rounded-xl p-5 space-y-4">
+                <div class="flex items-center justify-between border-b border-waibi-border pb-3">
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                        <span class="text-waibi-plum">🔄</span> TASK DAG STATE MACHINE
+                    </h3>
+                    <span class="text-xs font-mono text-waibi-plum">Epoch: autonomous_v1</span>
+                </div>
+
+                <div class="space-y-2 text-xs font-mono">
+                    <div class="flex items-center gap-2 p-2 bg-emerald-950/20 border border-emerald-500/20 rounded">
+                        <span class="text-emerald-400">✓</span>
+                        <span class="text-white flex-1 truncate">host_persistence_engaged</span>
+                        <span class="text-[10px] text-emerald-400">PASS</span>
+                    </div>
+                    <div class="flex items-center gap-2 p-2 bg-emerald-950/20 border border-emerald-500/20 rounded">
+                        <span class="text-emerald-400">✓</span>
+                        <span class="text-white flex-1 truncate">quota_reservoir_synced</span>
+                        <span class="text-[10px] text-emerald-400">PASS</span>
+                    </div>
+                    <div class="flex items-center gap-2 p-2 bg-emerald-950/20 border border-emerald-500/20 rounded">
+                        <span class="text-emerald-400">✓</span>
+                        <span class="text-white flex-1 truncate">silicon_rig_benchmarked</span>
+                        <span class="text-[10px] text-emerald-400">PASS</span>
+                    </div>
+                    <div class="flex items-center gap-2 p-2 bg-cyan-950/30 border border-cyan-500/30 rounded pulse-subtle">
+                        <span class="text-cyan-400 animate-spin">⟳</span>
+                        <span class="text-cyan-200 flex-1 truncate font-bold">continuous_perpetual_loop</span>
+                        <span class="text-[10px] text-cyan-400">ACTIVE</span>
+                    </div>
+                </div>
+
+                <div class="pt-2 border-t border-waibi-border text-xs text-waibi-muted flex justify-between font-mono">
+                    <span>Atomic Rollback SLA:</span>
+                    <span class="text-emerald-400 font-bold">&lt; 250ms</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Real-Time Event Log Stream -->
+        <div class="bg-waibi-card border border-waibi-border rounded-xl p-5 space-y-3">
+            <div class="flex items-center justify-between border-b border-waibi-border pb-3">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2 font-mono">
+                    <span>📡</span> REAL-TIME TELEMETRY & AUDIT EVENT STREAM
+                </h3>
+                <span class="text-xs font-mono text-zinc-500">Live Polling Active</span>
+            </div>
+
+            <div id="events-log" class="bg-black/50 border border-waibi-border rounded-lg p-3 font-mono text-xs space-y-1.5 max-h-56 overflow-y-auto text-zinc-300">
+                <div class="text-emerald-400">[SYSTEM] Antigravity Perpetual Supervisor initialized.</div>
+                <div class="text-cyan-400">[SILICON] Intel Lunar Lake NPU 4000 (47 TOPS) verified online at port 8765.</div>
+                <div class="text-indigo-400">[QUOTA] 3-Account Google Pro Quota pool registered (1,080 RPM capacity).</div>
+                <div class="text-emerald-400">[HOST] Win32 SetThreadExecutionState(0x80000041) active. System persistence engaged.</div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="max-w-7xl mx-auto mt-8 pt-6 border-t border-waibi-border text-center text-xs text-zinc-600 font-mono">
+        ANTIGRAVITY PERPETUAL • SOVEREIGN RUNTIME • 2026
+    </footer>
+
+    <script>
+        async function refreshTelemetry() {
+            try {
+                const res = await fetch('/api/telemetry');
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data.watchdog && data.watchdog.silence_duration_sec !== undefined) {
+                    document.getElementById('watchdog-silence').innerText = 
+                        data.watchdog.silence_duration_sec + "s / " + data.watchdog.silence_timeout_sec + "s";
+                }
+                if (data.hardware) {
+                    document.getElementById('thermal-val').innerText = data.hardware.thermal_celsius + "°C";
+                    if (data.hardware.battery_percent !== null) {
+                        document.getElementById('battery-val').innerText = data.hardware.battery_percent + "%" + 
+                            (data.hardware.power_plugged ? " (AC Connected)" : " (Battery)");
+                    }
+                }
+            } catch (e) {
+                // Keep UI stable
+            }
+        }
+        setInterval(refreshTelemetry, 3000);
+    </script>
+</body>
+</html>

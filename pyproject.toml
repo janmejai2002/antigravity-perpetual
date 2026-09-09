@@ -1,0 +1,77 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "antigravity-perpetual"
+version = "1.0.0"
+description = "Autonomous Multi-Day Agent Supervisor, 3-Account Quota Reservoir & Zero-Sleep Runtime for Google Antigravity & AI Coding Agents"
+readme = "README.md"
+authors = [
+    { name = "Janmejai Singh Minhas", email = "janmejai2002@gmail.com" }
+]
+license = { text = "MIT" }
+keywords = [
+    "antigravity",
+    "agentic-ai",
+    "quota-rotator",
+    "token-compression",
+    "intel-lunar-lake",
+    "npu",
+    "modern-standby",
+    "autonomous-agent",
+    "circuit-breaker"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows :: Windows 11",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: System :: Monitoring"
+]
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn>=0.28.0",
+    "pydantic>=2.6.0",
+    "pyyaml>=6.0.1",
+    "psutil>=5.9.8",
+    "requests>=2.31.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "black>=24.2.0",
+    "flake8>=7.0.0"
+]
+npu = [
+    "openvino>=2024.4.0",
+    "numpy>=1.26.0"
+]
+
+[project.scripts]
+perpetual = "antigravity_perpetual.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/janmejai2002/antigravity-perpetual"
+Repository = "https://github.com/janmejai2002/antigravity-perpetual.git"
+Issues = "https://github.com/janmejai2002/antigravity-perpetual/issues"
+Documentation = "https://github.com/janmejai2002/antigravity-perpetual#readme"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["antigravity_perpetual*"]
+exclude = ["tests*", "docs*", "scripts*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --strict-markers -p no:httpbin -p no:pytest_httpbin"
