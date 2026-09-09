@@ -24,11 +24,16 @@ from antigravity_perpetual.hardware.npu_fallback import NPUFallback
 
 
 from antigravity_perpetual.supervisor.notifier import AlertNotifier, AlertCategory
+from antigravity_perpetual.state.analytics import AnalyticsEngine
 
 
 class HeartbeatRequest(BaseModel):
     caller: Optional[str] = "agent"
     task_id: Optional[str] = None
+
+
+class SwitchAccountRequest(BaseModel):
+    identifier: str
 
 
 class NPUEmbedRequest(BaseModel):
@@ -81,6 +86,9 @@ def create_app(
         gateway_url=config.antigravity_tools.gateway_url,
         timeout_sec=config.antigravity_tools.timeout_sec
     )
+    bridge.sync_accounts_into_ledger()
+    analytics = AnalyticsEngine(db_path=config.db_path)
+
     power_mgr = power_manager or PowerManager()
     if not power_mgr.is_active:
         power_mgr.enable_perpetual_mode()
@@ -142,6 +150,8 @@ def create_app(
         gateway_ok, gateway_version = bridge.is_gateway_online()
         npu_ok = npu_fallback.is_available()
         accounts = ledger.get_account_quotas()
+        curr_active_id = bridge.get_current_account_id()
+        active_details = bridge.get_active_account_details()
 
         return JSONResponse(content={
             "status": "online",
@@ -158,6 +168,7 @@ def create_app(
                 "url": config.npu.npu_server_url,
                 "target_embedding_latency_ms": config.npu.target_embedding_latency_ms
             },
+            "active_account": active_details,
             "hardware": {
                 "cpu_percent": hw.cpu_percent,
                 "memory_percent": hw.memory_percent,
@@ -176,6 +187,7 @@ def create_app(
                 {
                     "id": a.account_id,
                     "name": a.account_name,
+                    "is_active": (a.account_id == curr_active_id),
                     "current_rpm": a.current_rpm,
                     "rpm_limit": a.rpm_limit,
                     "current_tpm": a.current_tpm,
@@ -192,10 +204,12 @@ def create_app(
     @app.get("/api/accounts")
     async def get_accounts():
         accounts = ledger.get_account_quotas()
+        curr_active_id = bridge.get_current_account_id()
         return JSONResponse(content=[
             {
                 "id": a.account_id,
                 "name": a.account_name,
+                "is_active": (a.account_id == curr_active_id),
                 "rpm": f"{a.current_rpm}/{a.rpm_limit}",
                 "tpm": f"{a.current_tpm}/{a.tpm_limit}",
                 "rpd": f"{a.current_rpd}/{a.rpd_limit}",
@@ -203,6 +217,34 @@ def create_app(
             }
             for a in accounts
         ])
+
+    @app.get("/api/accounts/active")
+    async def get_active_account():
+        details = bridge.get_active_account_details()
+        return JSONResponse(content=details or {"current_account_id": None})
+
+    @app.post("/api/accounts/cycle")
+    async def post_cycle_account():
+        res = bridge.force_cycle()
+        return JSONResponse(content=res)
+
+    @app.post("/api/accounts/switch")
+    async def post_switch_account(req: Optional[SwitchAccountRequest] = None, account_id: Optional[str] = None):
+        target = (req.identifier if req else None) or account_id
+        if not target:
+            raise HTTPException(status_code=400, detail="Must provide identifier or account_id")
+        res = bridge.switch_active_account(target)
+        return JSONResponse(content=res)
+
+    @app.get("/api/analytics/summary")
+    async def get_analytics_summary(hours: float = 24.0):
+        data = analytics.get_summary_metrics(window_hours=hours)
+        return JSONResponse(content=data)
+
+    @app.get("/api/analytics/review")
+    async def get_analytics_review():
+        report = analytics.generate_v2_review_report()
+        return JSONResponse(content=report)
 
     @app.get("/api/alerts")
     async def get_alerts(limit: int = 50):

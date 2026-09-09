@@ -62,28 +62,84 @@ def cmd_accounts(args):
     print_banner()
     cfg = load_config(args.config)
     ledger = QuotaLedger(db_path=cfg.db_path)
-    accounts = ledger.get_account_quotas()
-    if not accounts:
-        # Register defaults from config if empty
-        for a in cfg.accounts:
-            from antigravity_perpetual.quota.models import AccountQuota
-            ledger.register_account(AccountQuota(
-                account_id=a.id,
-                account_name=a.name,
-                rpm_limit=a.rpm_limit,
-                tpm_limit=a.tpm_limit,
-                rpd_limit=a.rpd_limit,
-                priority=a.priority
-            ))
-        accounts = ledger.get_account_quotas()
+    bridge = AntigravityToolsBridge(gateway_url=cfg.antigravity_tools.gateway_url)
+    bridge.sync_accounts_into_ledger(ledger=ledger)
 
-    print(f"{'ACCOUNT ID':<18} {'NAME':<22} {'RPM':<12} {'TPM':<16} {'RPD':<10} {'CIRCUIT':<10}")
+    # Check for sub-actions: cycle or switch
+    sub_act = getattr(args, "account_action", None)
+    if sub_act == "cycle":
+        print(" [*] Cycling active account to next healthy candidate...")
+        res = bridge.force_cycle()
+        if res.get("success"):
+            print(f" [+] SUCCESS: Switched active account to -> {res.get('switched_to')} ({res.get('account_id')[:8]}...)")
+        else:
+            print(f" [-] FAILED: {res.get('error')}")
+        print("=" * 72)
+        return
+    elif sub_act == "switch":
+        target = getattr(args, "identifier", None)
+        if not target:
+            print(" [-] Error: Must specify email or UUID for switch (e.g. 'perpetual accounts switch user@gmail.com')")
+            return
+        print(f" [*] Switching active account to: {target}...")
+        res = bridge.switch_active_account(target)
+        if res.get("success"):
+            print(f" [+] SUCCESS: Active account switched to -> {res.get('switched_to')} ({res.get('account_id')[:8]}...)")
+        else:
+            print(f" [-] FAILED: {res.get('error')}")
+        print("=" * 72)
+        return
+
+    accounts = ledger.get_account_quotas()
+    curr_id = bridge.get_current_account_id()
+
+    print(f"{'STATUS':<10} {'ACCOUNT ID':<18} {'NAME / EMAIL':<32} {'RPM':<10} {'RPD':<10} {'CIRCUIT':<10}")
     print("-" * 72)
     for a in accounts:
+        is_curr = "● ACTIVE" if a.account_id == curr_id else "  STANDBY"
         rpm_disp = f"{a.current_rpm}/{a.rpm_limit}"
-        tpm_disp = f"{a.current_tpm}/{a.tpm_limit}"
         rpd_disp = f"{a.current_rpd}/{a.rpd_limit}"
-        print(f"{a.account_id:<18} {a.account_name:<22} {rpm_disp:<12} {tpm_disp:<16} {rpd_disp:<10} {a.circuit_state.value:<10}")
+        name_disp = (a.account_name[:30] + "..") if len(a.account_name) > 32 else a.account_name
+        print(f"{is_curr:<10} {a.account_id[:16]+'..':<18} {name_disp:<32} {rpm_disp:<10} {rpd_disp:<10} {a.circuit_state.value:<10}")
+    print("=" * 72)
+    print(" [Tip] Force cycle account:   perpetual accounts cycle")
+    print(" [Tip] Switch to specific:    perpetual accounts switch <email_or_uuid>")
+    print("=" * 72)
+
+
+def cmd_review(args):
+    print_banner()
+    cfg = load_config(args.config)
+    from antigravity_perpetual.state.analytics import AnalyticsEngine
+    analytics = AnalyticsEngine(db_path=cfg.db_path)
+    report = analytics.generate_v2_review_report()
+
+    grade = report["architectural_grade"]
+    score = report["system_score"]
+    verdict = report["verdict"]
+
+    print(f" [ARCHITECTURAL GRADE]  : {grade} ({score}/100) - {verdict}")
+    metrics = report["metrics"]
+    print(f" [Total Requests (48h)] : {metrics['total_requests']} (Success rate: {metrics['success_rate_percent']}%)")
+    print(f" [Latency Percentiles]  : p50: {metrics['latency_ms']['p50']}ms | p90: {metrics['latency_ms']['p90']}ms | p99: {metrics['latency_ms']['p99']}ms")
+    print(f" [Account Load Balance] : {metrics['account_balance_index_percent']}% Shannon Entropy")
+    print(f" [Quota 429 Incidents]  : {metrics['quota_exhaustion_429s']}")
+    print("-" * 72)
+    print(" [KEY OPERATIONAL STRENGTHS]:")
+    for s in report["strengths"]:
+        print(f"   [+] {s}")
+    if report["recommendations"]:
+        print("\n [V2 ARCHITECTURAL RECOMMENDATIONS]:")
+        for r in report["recommendations"]:
+            print(f"   [!] [{r['priority']}] {r['finding']}")
+            print(f"       -> Action: {r['v2_solution']}")
+    else:
+        print("\n [V2 ARCHITECTURAL RECOMMENDATIONS]: All operational heuristics optimal.")
+
+    print("-" * 72)
+    print(" [V2 EVOLUTION ROADMAP]:")
+    for p in report["v2_blueprint"]["pillars"]:
+        print(f"   * {p['name']}: {p['description']}")
     print("=" * 72)
 
 
@@ -284,7 +340,12 @@ def main():
     subparsers.add_parser("status", help="Display host persistence, thermal, and bridge status")
 
     # accounts
-    subparsers.add_parser("accounts", help="Display active accounts and quota reservoir meters")
+    p_acc = subparsers.add_parser("accounts", help="Display active accounts and quota reservoir meters")
+    p_acc.add_argument("account_action", nargs="?", choices=["list", "cycle", "switch"], default="list", help="Account action")
+    p_acc.add_argument("identifier", nargs="?", default=None, help="Email or UUID when switching account")
+
+    # review
+    subparsers.add_parser("review", help="Generate automated V2 architectural review and heuristics grade")
 
     # init
     p_init = subparsers.add_parser("init", help="Initialize a default perpetual_config.yaml")
@@ -306,6 +367,8 @@ def main():
         cmd_status(args)
     elif args.command == "accounts":
         cmd_accounts(args)
+    elif args.command == "review":
+        cmd_review(args)
     elif args.command == "init":
         cmd_init(args)
     elif args.command == "service":

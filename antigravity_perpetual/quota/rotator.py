@@ -17,13 +17,23 @@ class QuotaRotator:
         self.circuit_breaker = circuit_breaker
         self._round_robin_idx = 0
 
-    def select_account(self, estimated_tokens: int = 1000, now: Optional[float] = None) -> Optional[AccountQuota]:
+    def select_account(
+        self,
+        estimated_tokens: int = 1000,
+        now: Optional[float] = None,
+        exclude_account_id: Optional[str] = None
+    ) -> Optional[AccountQuota]:
         if now is None:
             now = time.time()
 
         accounts = self.ledger.get_account_quotas()
         if not accounts:
             return None
+
+        if exclude_account_id:
+            accounts = [a for a in accounts if a.account_id != exclude_account_id]
+            if not accounts:
+                accounts = self.ledger.get_account_quotas()
 
         # Sort by priority
         accounts.sort(key=lambda a: a.priority)
@@ -64,6 +74,20 @@ class QuotaRotator:
                 return a
 
         return None
+
+    def force_cycle_next(self, current_account_id: Optional[str] = None) -> Optional[AccountQuota]:
+        """Advance round-robin index and pick next candidate."""
+        accounts = self.ledger.get_account_quotas()
+        if not accounts:
+            return None
+        accounts.sort(key=lambda a: a.priority)
+        if current_account_id:
+            for idx, a in enumerate(accounts):
+                if a.account_id == current_account_id:
+                    # Next account
+                    return accounts[(idx + 1) % len(accounts)]
+        self._round_robin_idx += 1
+        return accounts[self._round_robin_idx % len(accounts)]
 
     def record_completion(
         self,
