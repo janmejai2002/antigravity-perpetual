@@ -228,18 +228,29 @@ def cmd_service(args):
 
     elif args.service_action == "status":
         print_banner()
-        print(f" [Scheduled Task]       : {task_name}")
+        print(f" [Service Name]         : {task_name}")
         ps_cmd = f"Get-ScheduledTask -TaskName '{task_name}' -ErrorAction SilentlyContinue | Select-Object TaskName, State | ConvertTo-Json"
         res = subprocess.run(["powershell", "-NoProfile", "-Command", ps_cmd], text=True, capture_output=True)
+        is_task_reg = False
         if res.returncode == 0 and res.stdout.strip():
             try:
                 data = json.loads(res.stdout)
                 state_str = {0: "Unknown", 1: "Disabled", 2: "Queued", 3: "Ready", 4: "Running"}.get(data.get("State"), str(data.get("State")))
-                print(f" [Registration State]   : REGISTERED (State: {state_str})")
+                print(f" [Scheduled Task]       : REGISTERED (State: {state_str})")
+                is_task_reg = True
             except Exception:
-                print(f" [Registration State]   : REGISTERED")
+                print(f" [Scheduled Task]       : REGISTERED")
+                is_task_reg = True
         else:
-            print(f" [Registration State]   : NOT_REGISTERED")
+            print(f" [Scheduled Task]       : NOT_REGISTERED")
+
+        reg_cmd = f"(Get-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -ErrorAction SilentlyContinue).{task_name}"
+        res_reg = subprocess.run(["powershell", "-NoProfile", "-Command", reg_cmd], text=True, capture_output=True)
+        if res_reg.returncode == 0 and res_reg.stdout.strip():
+            print(f" [Registry Auto-Start]  : ACTIVE (HKCU Run on Logon)")
+            print(f" [Target Command]       : {res_reg.stdout.strip()}")
+        else:
+            print(f" [Registry Auto-Start]  : INACTIVE")
 
         # Check if daemon is listening
         import socket
@@ -251,6 +262,7 @@ def cmd_service(args):
         except Exception:
             print(f" [Live Daemon :8765]   : NOT_LISTENING")
         print("=" * 72)
+
 
 
 def main():
