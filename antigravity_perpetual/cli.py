@@ -96,7 +96,7 @@ def cmd_accounts(args):
     print(f"{'STATUS':<10} {'ACCOUNT ID':<18} {'NAME / EMAIL':<32} {'RPM':<10} {'RPD':<10} {'CIRCUIT':<10}")
     print("-" * 72)
     for a in accounts:
-        is_curr = "● ACTIVE" if a.account_id == curr_id else "  STANDBY"
+        is_curr = "* ACTIVE" if a.account_id == curr_id else "  STANDBY"
         rpm_disp = f"{a.current_rpm}/{a.rpm_limit}"
         rpd_disp = f"{a.current_rpd}/{a.rpd_limit}"
         name_disp = (a.account_name[:30] + "..") if len(a.account_name) > 32 else a.account_name
