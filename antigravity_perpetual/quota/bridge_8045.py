@@ -1,12 +1,9 @@
-"""
-Adapter Bridge for lbjlaq/antigravity-tools Local Proxy Gateway (127.0.0.1:8045).
-Coordinates account switching, session verification, and request forwarding.
-"""
-from __future__ import annotations
-
+import json
+import os
 import time
+from pathlib import Path
+from typing import Any, Dict, Optional, Tuple
 import requests
-from typing import Dict, Any, Optional, Tuple
 
 from antigravity_perpetual.quota.rotator import QuotaRotator
 
@@ -16,11 +13,33 @@ class AntigravityToolsBridge:
         self,
         rotator: Optional[QuotaRotator] = None,
         gateway_url: str = "http://127.0.0.1:8045",
+        api_key: Optional[str] = None,
         timeout_sec: float = 30.0
     ):
         self.rotator = rotator
         self.gateway_url = gateway_url.rstrip("/")
         self.timeout_sec = timeout_sec
+        self.api_key = api_key or self._discover_api_key()
+
+    def _discover_api_key(self) -> Optional[str]:
+        env_key = os.environ.get("ANTIGRAVITY_TOOLS_API_KEY")
+        if env_key:
+            return env_key
+        config_path = Path.home() / ".antigravity_tools" / "gui_config.json"
+        if config_path.exists():
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    return data.get("proxy", {}).get("api_key")
+            except Exception:
+                pass
+        return None
+
+    def _headers(self, with_auth: bool = True) -> Dict[str, str]:
+        headers = {"Content-Type": "application/json"}
+        if with_auth and self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        return headers
 
     def is_gateway_online(self) -> Tuple[bool, Optional[str]]:
         """Check if Antigravity Tools service is listening and responsive."""
@@ -32,6 +51,34 @@ class AntigravityToolsBridge:
             return False, f"HTTP {res.status_code}"
         except Exception as e:
             return False, str(e)
+
+    def is_proxy_running(self) -> bool:
+        """Check if the internal proxy is running."""
+        try:
+            res = requests.get(
+                f"{self.gateway_url}/api/proxy/status",
+                headers=self._headers(with_auth=True),
+                timeout=3.0
+            )
+            if res.status_code == 200:
+                return res.json().get("running", False)
+            return False
+        except Exception:
+            return False
+
+    def ensure_proxy_running(self) -> bool:
+        """Ensure proxy is started, starting it via API if currently disabled."""
+        if self.is_proxy_running():
+            return True
+        try:
+            res = requests.post(
+                f"{self.gateway_url}/api/proxy/start",
+                headers=self._headers(with_auth=True),
+                timeout=5.0
+            )
+            return res.status_code == 200
+        except Exception:
+            return False
 
     def forward_chat_completion(
         self,
@@ -45,7 +92,7 @@ class AntigravityToolsBridge:
             if selected_account and not account_id:
                 account_id = selected_account.account_id
 
-        headers = {"Content-Type": "application/json"}
+        headers = self._headers(with_auth=True)
         if account_id:
             headers["X-Antigravity-Account-Id"] = account_id
 
